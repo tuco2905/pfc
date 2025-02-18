@@ -1,0 +1,168 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum RequestStatus {
+  AGUARDANDO_CHEFE_FUSEX_1
+  AGUARDANDO_CHEFE_AUDITORIA_1
+  AGUARDANDO_AUDITOR
+  AGUARDANDO_CHEFE_AUDITORIA_2
+  AGUARDANDO_CHEFE_FUSEX_2
+  AGUARDANDO_HOMOLOGADOR_SOLICITANTE_1
+  AGUARDANDO_HOMOLOGADOR_SOLICITADA_1
+  AGUARDANDO_CHEFE_DIV_MEDICINA_1
+  AGUARDANDO_ESPECIALISTA
+  AGUARDANDO_CHEFE_DIV_MEDICINA_2
+  AGUARDANDO_COTACAO
+  AGUARDANDO_CHEFE_DIV_MEDICINA_3
+  AGUARDANDO_HOMOLOGADOR_SOLICITADA_2
+  AGUARDANDO_HOMOLOGADOR_SOLICITANTE_2
+  AGUARDANDO_CHEFE_FUSEX_3
+  AGUARDANDO_PASSAGEM
+  AGUARDANDO_CHEFE_FUSEX_4
+  AGUARDANDO_HOMOLOGADOR_SOLICITANTE_3
+  AGUARDANDO_CHEM_1
+  AGUARDANDO_CHEFE_SECAO_REGIONAL_1
+  AGUARDANDO_OPERADOR_SECAO_REGIONAL
+  AGUARDANDO_CHEFE_SECAO_REGIONAL_2
+  AGUARDANDO_CHEM_2
+  AGUARDANDO_SUBDIRETOR_SAUDE_1
+  AGUARDANDO_DRAS
+  AGUARDANDO_SUBDIRETOR_SAUDE_2
+  AGUARDANDO_CHEM_3
+  AGUARDANDO_RESPOSTA
+  REPROVADO
+  REPROVADO_DSAU
+  CANCELADO
+  APROVADO
+  // APROVADO_DSAU
+}
+
+enum ActionType {
+  CRIACAO
+  ORCAMENTO
+  ESCOLHA_OMS
+  APROVACAO
+  REPROVACAO
+  CANCELAMENTO
+}
+
+enum Role {
+  SUPERADMIN
+  OPERADOR_FUSEX
+  CHEFE_FUSEX
+  AUDITOR
+  CHEFE_AUDITORIA
+  ESPECIALISTA
+  CHEFE_DIV_MEDICINA
+  COTADOR
+  HOMOLOGADOR
+  CHEM
+  CHEFE_SECAO_REGIONAL
+  OPERADOR_SECAO_REGIONAL
+  DRAS
+  SUBDIRETOR_SAUDE
+}
+
+model User {
+  id             String        @id @default(uuid())
+  email          String        @unique
+  cpf            String        @unique
+  password       String
+  name           String
+  role           Role
+  organization   Organization? @relation(fields: [organizationId], references: [id])
+  organizationId String?
+  createdAt      DateTime      @default(now())
+  region         Region?       @relation(fields: [regionId], references: [id])
+  regionId       String?
+  actions        ActionLog[]
+}
+
+model Organization {
+  id               String            @id @default(uuid())
+  name             String
+  users            User[]
+  region           Region            @relation(fields: [regionId], references: [id], onDelete: Cascade)
+  regionId         String
+  sentRequests     Request[]
+  receivedRequests RequestResponse[]
+}
+
+model Region {
+  id            String         @id @default(uuid())
+  name          String
+  organizations Organization[]
+  users         User[]
+}
+
+model Pacient {
+  cpf         String    @id
+  precCp      String    @unique
+  name        String
+  rank        String
+  isDependent Boolean
+  requests    Request[]
+}
+
+model Request {
+  id                       String            @id @default(uuid())
+  description              String?
+  pacient                  Pacient           @relation(fields: [pacientCpf], references: [cpf], onDelete: Cascade)
+  pacientCpf               String
+  sender                   Organization      @relation(fields: [senderId], references: [id], onDelete: Cascade)
+  senderId                 String
+  requestResponses         RequestResponse[]
+  requestedOrganizationIds String[]
+  status                   RequestStatus     @default(AGUARDANDO_CHEFE_FUSEX_1)
+  cbhpmCode                String
+  needsCompanion           Boolean
+  opmeCost                 Int
+  psaCost                  Int?
+  createdAt                DateTime          @default(now())
+  updatedAt                DateTime          @updatedAt
+  actions                  ActionLog[]
+}
+
+model RequestResponse {
+  id            String        @id @default(uuid())
+  request       Request       @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  requestId     String
+  receiver      Organization  @relation(fields: [receiverId], references: [id], onDelete: Cascade)
+  receiverId    String
+  status        RequestStatus @default(AGUARDANDO_HOMOLOGADOR_SOLICITADA_1)
+  opmeCost      Int?
+  procedureCost Int?
+  ticketCost    Int?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  actions       ActionLog[]
+  selected      Boolean       @default(false)
+
+  @@unique([requestId, receiverId])
+}
+
+model ActionLog {
+  id                String           @id @default(uuid())
+  request           Request?         @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  requestId         String?
+  requestResponse   RequestResponse? @relation(fields: [requestResponseId], references: [id])
+  requestResponseId String?
+  user              User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId            String
+  action            ActionType
+  observation       String?
+  files             String[]
+  createdAt         DateTime         @default(now())
+}
